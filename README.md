@@ -1,0 +1,1 @@
+If you are using IOS you can enter fullscreen by clicking share and then adding to your home screen. The game is currently only multiplayer and therefore has no bot to control the other paddle. Thanks for playing!
