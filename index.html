@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TXZX351KJ2"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-TXZX351KJ2');
+    </script>    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Retro Multiplayer Pong</title>
@@ -307,6 +315,22 @@
 
         // Start the game loop
         draw();
+    </script>
+  <!-- Measurement ID -->
+    <script>
+        gtag('config', 'G-TXZX351KJ2', { 'send_page_view': true });
+    </script>
+    <!-- End Measurement ID -->
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            let clickCount = 0;
+
+            document.getElementById('retroPongLink').addEventListener('click', () => {
+                clickCount++;
+                document.getElementById('clickCount').innerText = clickCount;
+            });
+        });
     </script>
 </body>
 </html>
