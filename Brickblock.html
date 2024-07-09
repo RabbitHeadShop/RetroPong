@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Square Game</title>
+    <style>
+        body, html {
+            background-color: #000;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: purple;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: none;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* Center vertically */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            margin-bottom: 20px;
+        }
+        .button-container button {
+            width: 200px;
+            background-color: red;
+            border: groove;
+          border-color: purple;
+          border-width: 5px;
+            color: purple;
+            padding: 15px 32px;
+          font-family: Arial, sans-serif;
+            text-align: center;
+            text-decoration: none;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+        .start-button, .game-over-buttons button {
+            background-color: #4CAF50;
+        }
+        .game-over-buttons {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .game-over-buttons p {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .game-over-buttons .score {
+            font-size: 18px;
+        }
+        .game-over-buttons button {
+            background-color: #f44336;
+            margin: 10px auto;
+        }
+        .difficulty-buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="button-container">
+        <div class="difficulty-buttons">
+            <button onclick="setDifficulty('very_easy')">Very Easy</button>
+            <button onclick="setDifficulty('easy')">Easy</button>
+            <button onclick="setDifficulty('medium')">Medium</button>
+            <button onclick="setDifficulty('hard')">Hard</button>
+        </div>
+        <button class="start-button" id="startButton" style="display: none;" onclick="startGame()">Start Game</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameOverScreen" class="game-over-buttons">
+        <p id="gameOverText">Game Over</p>
+        <p class="score" id="scoreText"></p>
+        <p class="high-score" id="highScoreText"></p>
+        <button onclick="restartGame()">Restart</button>
+        <button onclick="backToDifficulty()">Home</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const context = canvas.getContext('2d');
+
+        let square = { x: 0, y: 0, size: 50 };
+        let obstacles = [];
+        const obstacleHeight = 50;
+        const obstacleGap = 450;
+        let touchX = null; // Only X-axis touch input, null initially
+        let obstacleSpeed = 4;
+        let gameOver = false;
+        let gameStarted = false;
+        let obstacleCreationInterval;
+        let score = 0; // Initialize score variable
+        let highScores = {
+            very_easy: 0,
+            easy: 0,
+            medium: 0,
+            hard: 0
+        };
+
+        // Load high scores from localStorage if available
+        if (localStorage.getItem('highScores')) {
+            highScores = JSON.parse(localStorage.getItem('highScores'));
+        }
+
+        // Image for square
+        const squareImage = new Image();
+        squareImage.src = 'https://static.wikia.nocookie.net/tinytower/images/8/86/Parachute.png/revision/latest/scale-to-width-down/250?cb=20210624200514';
+
+        // Image for obstacle
+        const obstacleImage = new Image();
+        obstacleImage.src = 'https://cdn.vectorstock.com/i/preview-1x/53/77/pixel-art-seamless-pattern-brick-texture-vector-30705377.jpg';
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // Center the square in the viewport
+            square.x = canvas.width / 2 - square.size / 2;
+            square.y = canvas.height / 2 - square.size / 2;
+
+            draw();
+        }
+
+        function draw() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw the animated GIF instead of a filled rectangle
+            context.drawImage(squareImage, square.x, square.y, square.size, square.size);
+
+            // Draw obstacles with image
+            obstacles.forEach(obstacle => {
+                context.drawImage(obstacleImage, 0, obstacle.y, obstacle.holeX, obstacle.height);
+                context.drawImage(obstacleImage, obstacle.holeX + obstacle.holeWidth, obstacle.y, canvas.width - (obstacle.holeX + obstacle.holeWidth), obstacle.height);
+            });
+
+            if (gameOver) {
+                // Display score and high score on game over
+                context.fillStyle = 'white';
+                context.font = '20px Arial';
+                context.fillText(`Score: ${score}`, 10, 30);
+                const currentDifficulty = getCurrentDifficulty();
+                context.fillText(`High Score (${currentDifficulty}): ${highScores[currentDifficulty]}`, 10, 60);
+            }
+        }
+
+        function update() {
+            if (gameStarted) {
+                if (touchX !== null) {
+                    // Move square based on touch (only X-axis)
+                    square.x = touchX - square.size / 2;
+
+                    // Ensure square stays within bounds of canvas horizontally
+                    square.x = Math.max(0, Math.min(canvas.width - square.size, square.x));
+                } else {
+                    // Keep square centered horizontally
+                    square.x = canvas.width / 2 - square.size / 2;
+                }
+
+                // Update obstacle positions
+                obstacles.forEach(obstacle => {
+                    obstacle.y -= obstacleSpeed;
+
+                    // Check if obstacle has passed the square
+                    if (obstacle.y + obstacle.height < square.y && !obstacle.passed) {
+                        obstacle.passed = true;
+                        score++; // Increment score
+
+                        // Update high score if current score is higher
+                        const currentDifficulty = getCurrentDifficulty();
+                        if (score > highScores[currentDifficulty]) {
+                            highScores[currentDifficulty] = score;
+                            localStorage.setItem('highScores', JSON.stringify(highScores));
+                        }
+                    }
+                });
+
+                // Remove obstacles that are off-screen
+                obstacles = obstacles.filter(obstacle => obstacle.y + obstacle.height > 0);
+
+                // Check for collisions
+                obstacles.forEach(obstacle => {
+                    if (
+                        (square.x < obstacle.holeX &&
+                            square.x + square.size > 0 &&
+                            square.y < obstacle.y + obstacle.height &&
+                            square.y + square.size > obstacle.y) ||
+                        (square.x < canvas.width &&
+                            square.x + square.size > obstacle.holeX + obstacle.holeWidth &&
+                            square.y < obstacle.y + obstacle.height &&
+                            square.y + square.size > obstacle.y)
+                    ) {
+                        // Collision detected, stop the game
+                        gameOver = true;
+                    }
+                });
+            }
+
+            if (gameOver) {
+                stopGame();
+            } else {
+                draw();
+                requestAnimationFrame(update);
+            }
+        }
+
+        function stopGame() {
+            clearInterval(obstacleCreationInterval);
+            canvas.style.display = 'none'; // Hide the canvas
+            document.getElementById('gameOverScreen').style.display = 'block';
+            document.getElementById('scoreText').textContent = `Score: ${score}`; // Display score
+            const currentDifficulty = getCurrentDifficulty();
+            document.getElementById('highScoreText').textContent = `High Score (${currentDifficulty}): ${highScores[currentDifficulty]}`; // Display high score
+            score = 0; // Reset score
+        }
+
+        function restartGame() {
+            gameOver = false;
+            canvas.style.display = 'none'; // Hide the canvas
+            document.getElementById('gameOverScreen').style.display = 'none';
+            resetGame();
+            score = 0; // Reset score
+            startGame(); // Restart the game
+        }
+
+        function backToDifficulty() {
+            gameOver = false;
+            canvas.style.display = 'none'; // Hide the canvas
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.querySelector('.difficulty-buttons').style.display = 'flex'; // Show difficulty buttons
+            document.querySelector('.button-container').style.display = 'flex'; // Show the button container
+            document.getElementById('startButton').style.display = 'none'; // Hide start button
+            score = 0; // Reset score
+            obstacles = []; // Clear obstacles
+            clearInterval(obstacleCreationInterval); // Clear obstacle creation interval
+            obstacles.forEach(obstacle => obstacle.passed = false); // Reset passed state
+
+            // Reset square position to center horizontally
+            square.x = canvas.width / 2 - square.size / 2;
+            touchX = null; // Reset touch input
+        }
+
+        function resetGame() {
+            square.x = canvas.width / 2 - square.size / 2;
+            square.y = canvas.height / 2 - square.size / 2;
+            touchX = null; // Reset touch input
+            obstacles = [];
+        }
+
+        function getCurrentDifficulty() {
+            // Determine the current difficulty based on obstacleSpeed
+            switch (obstacleSpeed) {
+                case 2:
+                    return 'very_easy';
+                case 3:
+                    return 'easy';
+                case 4:
+                    return 'medium';
+                case 5:
+                    return 'hard';
+                default:
+                    return 'medium'; // Default to medium if obstacleSpeed doesn't match known difficulties
+            }
+        }
+
+        function createObstacles() {
+            obstacles.push(createObstacle());
+        }
+
+        function createObstacle() {
+            const minObstacleWidth = 50;
+            const maxObstacleWidth = canvas.width - 60; // Ensure enough space for the hole (60px wide)
+
+            const holeX = Math.random() * (maxObstacleWidth - minObstacleWidth) + minObstacleWidth;
+            const y = canvas.height;
+
+            return { holeX, y, holeWidth: 100 /* HOLE WIDTH*/, height: obstacleHeight, passed: false };
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            touchX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            touchX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+        });
+
+        canvas.addEventListener('touchend', () => {
+            // No need to reset touchX here
+        });
+
+        function setDifficulty(difficulty) {
+            switch (difficulty) {
+                case 'very_easy':
+                    obstacleSpeed = 2;
+                    break;
+                case 'easy':
+                    obstacleSpeed = 3;
+                    break;
+                case 'medium':
+                    obstacleSpeed = 4;
+                    break;
+                case 'hard':
+                    obstacleSpeed = 5;
+                    break;
+                default:
+                    obstacleSpeed = 4;
+            }
+            document.querySelector('.difficulty-buttons').style.display = 'none'; // Hide difficulty buttons
+            document.getElementById('startButton').style.display = 'inline-block'; // Show start button
+        }
+
+        function startGame() {
+            document.querySelector('.button-container').style.display = 'none'; // Hide button container
+            canvas.style.display = 'block'; // Show canvas
+            obstacleCreationInterval = setInterval(createObstacles, 1000); // Create an obstacle every second
+            gameStarted = true;
+            update();
+        }
+
+        window.addEventListener('resize', resizeCanvas, false);
+        window.addEventListener('orientationchange', resizeCanvas, false);
+
+        resizeCanvas();
+    </script>
+</body>
+</html>
